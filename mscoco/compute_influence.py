@@ -55,7 +55,10 @@ if __name__ == '__main__':
     parser.add_argument('--loss_batch_size', type=int, default=8000, help='batch size for loss calculation, use the same as the pretrain batch size for best performance')
     parser.add_argument('--loss_time_samples', type=int, default=20, help='number of time samples to average over, use the same as the pretrain time samples for best performance')
     parser.add_argument('--device', type=str, default='cuda', help='device')
+    # add debugging flag (default: False)
+    parser.add_argument('--debug', action='store_true', help='debug mode')
     args = parser.parse_args()
+
 
     # load model and noise scheduler
     model, noise_scheduler = get_model(args.task, model_path=args.model_path)
@@ -68,6 +71,9 @@ if __name__ == '__main__':
 
     # load data loader
     dataset = get_dataset(args.task, dataroot=args.dataroot, split='train', mode='no_flip_and_flip')
+    # if debug mode, use 100 samples only
+    if args.debug:
+        dataset.length = 100  # Restrict dataset length
     small_bs = args.loss_batch_size // dataset.num_captions // args.loss_time_samples
     data_loader = torch.utils.data.DataLoader(
         dataset,
@@ -130,9 +136,15 @@ if __name__ == '__main__':
 
     # influence calculation
     print('Calculating influence and visualize results...')
-    influence = loss_no_flip_and_flip - np.load(args.pretrain_loss_path)
-    assert influence.shape == (len_dataset * 2,)
-    influence = np.maximum(influence[:len_dataset], influence[len_dataset:])
+    output_path = f"results/unlearned_loss_ulearnsteps_{args.unlearn_steps}_{args.weight_selection}.npy"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    np.save(output_path, loss_no_flip_and_flip)
+    influence = loss_no_flip_and_flip - np.load(args.pretrain_loss_path)[:dataset.length]
+    if args.debug:
+        pass
+    else:
+        assert influence.shape == (len_dataset * 2,)
+        influence = np.maximum(influence[:len_dataset], influence[len_dataset:])
 
     # save results
     os.makedirs(args.result_dir, exist_ok=True)
@@ -140,7 +152,7 @@ if __name__ == '__main__':
         'influence': influence,
         'rank': np.argsort(-influence),
     }
-    with open(os.path.join(args.result_dir, f'influence_{args.sample_idx}.pkl'), 'wb') as f:
+    with open(os.path.join(args.result_dir, f'influence_{args.sample_idx}_ulearnsteps_{args.unlearn_steps}_{args.weight_selection}.pkl'), 'wb') as f:
         pickle.dump(results, f)
 
     # visualize top 10 influential images
@@ -159,6 +171,6 @@ if __name__ == '__main__':
         plt.title(f'infl: {results["influence"][idx]:.2e}')
         plt.axis('off')
 
-    plt.savefig(os.path.join(args.result_dir, f'visualization_{args.sample_idx}.jpg'))
+    plt.savefig(os.path.join(args.result_dir, f'visualization_{args.sample_idx}_ulearnsteps_{args.unlearn_steps}_{args.weight_selection}.jpg'))
     plt.close()
     print('Results saved.')

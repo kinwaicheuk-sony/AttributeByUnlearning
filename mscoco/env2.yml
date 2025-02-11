@@ -1,0 +1,25 @@
+name: attr_mscoco2
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+channel_priority: true
+dependencies:
+  - python
+  - pip
+  - numpy
+  - pillow
+  - opencv
+  - pytorch==2.0.1
+  - torchvision==0.15.2
+  - diffusers==0.24.0
+  - mkl==2024.0
+  - transformers
+  - pycocotools
+  - tqdm
+  - matplotlib
+  - pandas
+  - cudatoolkit-dev
+  - pip:
+    - huggingface_hub[hf_transfer]==0.24
+    - hf_transfer
